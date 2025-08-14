@@ -239,7 +239,7 @@ export default function Home() {
       `${r.pnl >= 0 ? "+" : "-"}${money(Math.abs(r.pnl))}`,
       `${r.pnlPct.toFixed(2)}%`,
       r.cards,
-      `$${r.cardValue.toFixed(4)}`,
+      `$${r.cardValue.toFixed(2)}`,
     ]);
 
     autoTable(doc, {
