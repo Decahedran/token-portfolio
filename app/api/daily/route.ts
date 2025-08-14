@@ -14,21 +14,19 @@ function isUsMarketOpenNowET(): boolean {
   const mins = et.getHours() * 60 + et.getMinutes();
   return mins >= 570 && mins < 960; // 9:30–16:00 ET
 }
-
 function isPosNum(val: unknown): val is number {
   const x = Number(val);
   return Number.isFinite(x) && x > 0;
 }
 
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const setId = searchParams.get("set") || "set1";
   try {
-    const { searchParams } = new URL(req.url);
-    const setId = searchParams.get("set") || "set1";
-
     const marketOpen = isUsMarketOpenNowET();
     const lastRefreshed = await kv.get<number>(`price:last_refreshed:${setId}`);
-
     const portfolio = getPortfolio(setId);
+
     const rows = await Promise.all(
       portfolio.map(async (p) => {
         const priceObj = await ensurePrice(p.symbol, setId);
@@ -52,10 +50,15 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json({ rows, marketOpen, lastRefreshed: lastRefreshed ?? null, setId, _diag: { portfolioLen: portfolio.length } });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    // Return a 200 with an empty dataset but include the error so we can see it in the browser
-    return NextResponse.json({ rows: [], marketOpen: false, lastRefreshed: null, setId: null, error: msg });
+    return NextResponse.json(
+      { rows, marketOpen, lastRefreshed: lastRefreshed ?? null, setId },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch {
+    // Fail closed but don't leak internals
+    return NextResponse.json(
+      { rows: [], marketOpen: false, lastRefreshed: null, setId },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   }
 }

@@ -66,6 +66,32 @@ export const PORTFOLIO_SETS: PortfolioSet[] = [
       { symbol: "SBUX",  shares: 14, purchasePrice: 90,  cards: 700 },
     ],
   },
+  {
+    id: "set3",
+    name: "ST-091 • Master Veil",
+    rows: [
+      { symbol: "BRK-B", shares: 6,  purchasePrice: 340, cards: 400 },
+      { symbol: "NFLX",  shares: 5,  purchasePrice: 450, cards: 400 },
+      { symbol: "ADBE",  shares: 4,  purchasePrice: 480, cards: 400 },
+      { symbol: "ORCL",  shares: 12, purchasePrice: 120, cards: 600 },
+      { symbol: "CRM",   shares: 6,  purchasePrice: 220, cards: 500 },
+      { symbol: "INTC",  shares: 30, purchasePrice: 40,  cards: 900 },
+      { symbol: "QCOM",  shares: 10, purchasePrice: 150, cards: 500 },
+      { symbol: "TXN",   shares: 12, purchasePrice: 160, cards: 500 },
+      { symbol: "NKE",   shares: 18, purchasePrice: 90,  cards: 700 },
+      { symbol: "DIS",   shares: 15, purchasePrice: 95,  cards: 700 },
+      { symbol: "ABBV",  shares: 8,  purchasePrice: 150, cards: 500 },
+      { symbol: "MRK",   shares: 10, purchasePrice: 110, cards: 600 },
+      { symbol: "PFE",   shares: 30, purchasePrice: 35,  cards: 900 },
+      { symbol: "T",     shares: 50, purchasePrice: 18,  cards: 1200 },
+      { symbol: "VZ",    shares: 40, purchasePrice: 35,  cards: 1000 },
+      { symbol: "CVX",   shares: 12, purchasePrice: 155, cards: 600 },
+      { symbol: "GE",    shares: 6,  purchasePrice: 140, cards: 500 },
+      { symbol: "BA",    shares: 6,  purchasePrice: 180, cards: 500 },
+      { symbol: "SHOP",  shares: 10, purchasePrice: 70,  cards: 700 },
+      { symbol: "SBUX",  shares: 14, purchasePrice: 90,  cards: 700 },
+    ],
+  },
 ];
 
 // helpers
