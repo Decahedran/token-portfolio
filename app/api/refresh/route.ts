@@ -6,16 +6,48 @@ import { PORTFOLIO_SETS, getSymbols } from "@/data/portfolios";
 import { refreshMany } from "@/lib/prices";
 import { NextResponse } from "next/server";
 
+function nowInET(): Date {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+}
+function minutesSinceMidnightET(d = nowInET()): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+// Only run within +/- `tol` minutes of the target (in ET)
+function inWindowET(targetHour: number, targetMinute: number, tol = 5): boolean {
+  const m = minutesSinceMidnightET();
+  const t = targetHour * 60 + targetMinute;
+  return Math.abs(m - t) <= tol;
+}
+function isWeekdayET(): boolean {
+  const d = nowInET().getDay(); // 0=Sun .. 6=Sat
+  return d >= 1 && d <= 5;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const q = (searchParams.get("set") || "set1").toLowerCase();
+  const setQ = (searchParams.get("set") || "set1").toLowerCase();
+  const when = (searchParams.get("when") || "").toLowerCase(); // "", "open", "close"
 
-  const known = new Set(PORTFOLIO_SETS.map(s => s.id.toLowerCase()));
-  if (q !== "all" && !known.has(q)) {
-    return NextResponse.json({ ok: false, error: `unknown set '${q}'` }, { status: 400 });
+  // Optional guard: only proceed at the intended minute in ET
+  if (when) {
+    // 09:35 ET window for "open", 16:10 ET for "close"
+    const shouldRun =
+      when === "open"
+        ? inWindowET(9, 35, 6) && isWeekdayET()
+        : when === "close"
+        ? inWindowET(16, 10, 6) && isWeekdayET()
+        : true;
+
+    if (!shouldRun) {
+      return NextResponse.json({ ok: true, skipped: true, when, reason: "outside target window (ET)" });
+    }
   }
 
-  const setsToRun = q === "all" ? PORTFOLIO_SETS.map(s => s.id) : [q];
+  const known = new Set(PORTFOLIO_SETS.map(s => s.id.toLowerCase()));
+  const setsToRun = setQ === "all" ? PORTFOLIO_SETS.map(s => s.id) : (known.has(setQ) ? [setQ] : []);
+  if (setsToRun.length === 0) {
+    return NextResponse.json({ ok: false, error: `unknown set '${setQ}'` }, { status: 400 });
+  }
 
   const results: Array<{ setId: string; count: number; updated: number; message?: string }> = [];
   let totalSymbols = 0, totalUpdated = 0;
@@ -32,5 +64,5 @@ export async function GET(req: Request) {
     totalUpdated += updated;
   }
 
-  return NextResponse.json({ ok: true, totalSymbols, totalUpdated, results });
+  return NextResponse.json({ ok: true, totalSymbols, totalUpdated, results, when: when || null });
 }
