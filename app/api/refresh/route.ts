@@ -12,41 +12,34 @@ function nowInET(): Date {
 function minutesET(d = nowInET()): number {
   return d.getHours() * 60 + d.getMinutes();
 }
-function minutes(h: number, m: number) { return h * 60 + m; }
-function isWeekdayET(): boolean { const d = nowInET().getDay(); return d >= 1 && d <= 5; }
-
-// true if current ET time is in [start, end] inclusive
+function isWeekdayET(): boolean {
+  const d = nowInET().getDay(); // 0 Sun .. 6 Sat
+  return d >= 1 && d <= 5;
+}
 function inWindowET(startH: number, startM: number, endH: number, endM: number): boolean {
   const cur = minutesET();
-  const start = minutes(startH, startM);
-  const end = minutes(endH, endM);
+  const start = startH * 60 + startM;
+  const end = endH * 60 + endM;
   return cur >= start && cur <= end;
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const setQ = (searchParams.get("set") || "set1").toLowerCase();
-  const when = (searchParams.get("when") || "").toLowerCase(); // "", "open", "close"
+  const when = (searchParams.get("when") || "").toLowerCase(); // "", "close"
 
-  // Only proceed near the intended ET time if "when" is provided (cron calls)
-  if (when) {
-    const okTime =
-      when === "open"
-        // 09:35–10:55 ET covers both EST (09:35) and EDT (10:35)
-        ? inWindowET(9, 35, 10, 55) && isWeekdayET()
-        // 16:10–17:30 ET covers both EST (16:10) and EDT (17:10)
-        : when === "close"
-        ? inWindowET(16, 10, 17, 30) && isWeekdayET()
-        : true;
-
+  // Only run near US market close if 'when=close' (cron path)
+  if (when === "close") {
+    // 16:10–17:30 ET covers both EST (16:10) and EDT (17:10) with buffer
+    const okTime = inWindowET(16, 10, 17, 30) && isWeekdayET();
     if (!okTime) {
-      return NextResponse.json({ ok: true, skipped: true, when, reason: "outside ET window" });
+      return NextResponse.json({ ok: true, skipped: true, when, reason: "outside ET close window" });
     }
   }
 
   const known = new Set(PORTFOLIO_SETS.map(s => s.id.toLowerCase()));
   const setsToRun = setQ === "all" ? PORTFOLIO_SETS.map(s => s.id) : (known.has(setQ) ? [setQ] : []);
-  if (setsToRun.length === 0) {
+  if (!setsToRun.length) {
     return NextResponse.json({ ok: false, error: `unknown set '${setQ}'` }, { status: 400 });
   }
 
