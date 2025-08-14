@@ -1,6 +1,8 @@
 {
   "crons": [
-    { "path": "/api/refresh", "schedule": "35 9 * * 1-5", "timezone": "America/New_York" },
-    { "path": "/api/refresh", "schedule": "10 16 * * 1-5", "timezone": "America/New_York" }
+    { "path": "/api/refresh?set=all", "schedule": "35 13 * 3-10 1-5" },
+    { "path": "/api/refresh?set=all", "schedule": "35 14 * 11,12,1,2 1-5" },
+    { "path": "/api/refresh?set=all", "schedule": "10 20 * 3-10 1-5" },
+    { "path": "/api/refresh?set=all", "schedule": "10 21 * 11,12,1,2 1-5" }
   ]
 }
