@@ -4,6 +4,10 @@
 import { PORTFOLIO_SETS } from "@/data/portfolios";
 import { useEffect, useMemo, useState } from "react";
 
+// NEW: typed imports for PDF
+import jsPDF from "jspdf";
+import autoTable, { HookData } from "jspdf-autotable";
+
 type Row = {
   symbol: string;
   shares: number;
@@ -126,32 +130,29 @@ export default function Home() {
     return copy;
   }, [rows, sortKey, sortDir]);
 
-  // ---------- EXPORT: Excel (.xlsx) ----------
+    // ---------- EXPORT: Excel (.xlsx) ----------
   async function exportExcel() {
-    const XLSX = await import("xlsx"); // dynamic import for client-only
+    const XLSX: typeof import("xlsx") = await import("xlsx");
     const now = new Date();
-    const fn = `Portfolio_${currentSet.id}_${now.toISOString().slice(0,10)}.xlsx`;
+    const fn = `Portfolio_${currentSet.id}_${now.toISOString().slice(0, 10)}.xlsx`;
 
-    // Build AOA (array of arrays)
     const header = [
       "Symbol", "Shares", "Purchase", "Ref Price", "Holding Value",
       "Unrealized P/L", "P/L %", "Cards", "Per-Card Value"
     ];
-    const body = sortedRows.map(r => ([
+    const body = sortedRows.map((r) => ([
       r.symbol,
       r.shares,
       r.purchasePrice,
       r.refPrice,
       r.value,
       r.pnl,
-      r.pnlPct / 100,  // as fraction for proper Excel % formatting
+      r.pnlPct / 100, // fraction for %
       r.cards,
-      r.cardValue
+      r.cardValue,
     ]));
 
-    const totalsRow = [
-      "Totals", "", totals.cost, "", totals.value, totals.pnl, "", "", ""
-    ];
+    const totalsRow = ["Totals", "", totals.cost, "", totals.value, totals.pnl, "", "", ""];
 
     const ws = XLSX.utils.aoa_to_sheet([
       [`Portfolio — ${currentSet.name}`],
@@ -163,64 +164,56 @@ export default function Home() {
       totalsRow,
     ]);
 
-    // Column widths
-    ws["!cols"] = [
-      { wch: 10 }, // Symbol
-      { wch: 8  }, // Shares
-      { wch: 12 }, // Purchase
-      { wch: 12 }, // Ref Price
-      { wch: 14 }, // Holding Value
-      { wch: 14 }, // P/L
-      { wch: 8  }, // P/L %
-      { wch: 8  }, // Cards
-      { wch: 14 }, // Per-Card Value
+    // column widths
+    (ws as import("xlsx").WorkSheet)["!cols"] = [
+      { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 12 },
+      { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 14 },
     ];
 
-    // Apply number formats for numeric columns on data rows
-    const startRow = 5; // header is row 4, data starts at 5 (1-indexed)
+    // number formats for data rows
+    const startRow = 5; // header=4, data begins at 5 (1-indexed)
     const endRow = startRow + body.length - 1;
+
     const colFmt: Record<number, string> = {
-      2: "$#,##0.00", // Purchase (C)
-      3: "$#,##0.00", // Ref Price (D)
-      4: "$#,##0.00", // Holding Value (E)
-      5: "$#,##0.00;[Red]-$#,##0.00", // P/L (F) red negatives
-      6: "0.00%",     // P/L % (G) (we stored fraction)
-      8: "$#,##0.00" // Per-Card Value (I)
+      2: "$#,##0.00",                   // C: Purchase
+      3: "$#,##0.00",                   // D: Ref Price
+      4: "$#,##0.00",                   // E: Holding Value
+      5: "$#,##0.00;[Red]-$#,##0.00",   // F: P/L
+      6: "0.00%",                       // G: P/L %
+      8: "$#,##0.00",                 // I: Per-Card Value
     };
-    function cellRef(c:number, r:number){ return XLSX.utils.encode_cell({c, r}); }
+    const cellRef = (c: number, r: number) => XLSX.utils.encode_cell({ c, r });
 
     for (let r = startRow - 1; r <= endRow - 1; r++) {
       for (const [cStr, fmt] of Object.entries(colFmt)) {
         const c = Number(cStr);
         const addr = cellRef(c, r);
-        const cell = ws[addr];
+        const cell = (ws as import("xlsx").WorkSheet)[addr] as import("xlsx").CellObject | undefined;
         if (cell && typeof cell.v === "number") {
-          (cell as any).t = "n";
-          (cell as any).z = fmt;
+          cell.t = "n";
+          cell.z = fmt;
         }
       }
     }
-    // Totals row formats (last rows)
-    const totalsRowIdx = endRow + 2; // blank row + totals
-    for (const [cStr, fmt] of Object.entries({2:"$#,##0.00",4:"$#,##0.00",5:"$#,##0.00;[Red]-$#,##0.00"})) {
-      const addr = cellRef(Number(cStr), totalsRowIdx);
-      const cell = ws[addr];
-      if (cell && typeof cell.v === "number") {
-        (cell as any).t = "n";
-        (cell as any).z = fmt;
-      }
-    }
+
+    // totals row formats
+    const totalsRowIdx = endRow + 2;
+    (["C", "E", "F"] as const).forEach((col) => {
+      const addr = `${col}${totalsRowIdx + 1}`; // 1-indexed in A1
+      const cell = (ws as import("xlsx").WorkSheet)[addr] as import("xlsx").CellObject | undefined;
+      if (!cell || typeof cell.v !== "number") return;
+      cell.t = "n";
+      cell.z = col === "F" ? "$#,##0.00;[Red]-$#,##0.00" : "$#,##0.00";
+    });
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, currentSet.name.slice(0,31));
+    XLSX.utils.book_append_sheet(wb, ws, currentSet.name.slice(0, 31));
     XLSX.writeFile(wb, fn);
   }
 
-  // ---------- EXPORT: PDF ----------
-  async function exportPdf() {
-    const { jsPDF } = await import("jspdf");
-    const autoTable = (await import("jspdf-autotable")).default as any;
 
+    // ---------- EXPORT: PDF ----------
+  function exportPdf() {
     const doc = new jsPDF({ orientation: "landscape", unit: "pt" });
     const marginX = 40;
 
@@ -235,17 +228,18 @@ export default function Home() {
     const head = [
       ["Symbol","Shares","Purchase","Ref Price","Holding Value","Unrealized P/L","P/L %","Cards","Per-Card Value"]
     ];
-    const fmt = (n:number) => `$${n.toFixed(2)}`;
-    const body = sortedRows.map(r => [
+    const money = (n: number) => `$${n.toFixed(2)}`;
+
+    const body = sortedRows.map((r) => [
       r.symbol,
       r.shares,
-      fmt(r.purchasePrice),
-      fmt(r.refPrice),
-      fmt(r.value),
-      `${r.pnl >= 0 ? "+" : "-"}${fmt(Math.abs(r.pnl))}`,
+      money(r.purchasePrice),
+      money(r.refPrice),
+      money(r.value),
+      `${r.pnl >= 0 ? "+" : "-"}${money(Math.abs(r.pnl))}`,
       `${r.pnlPct.toFixed(2)}%`,
       r.cards,
-      `$${r.cardValue.toFixed(2)}`
+      `$${r.cardValue.toFixed(4)}`,
     ]);
 
     autoTable(doc, {
@@ -257,28 +251,33 @@ export default function Home() {
       columnStyles: {
         1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" },
         4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" },
-        7: { halign: "right" }, 8: { halign: "right" }
+        7: { halign: "right" }, 8: { halign: "right" },
       },
       margin: { left: marginX, right: marginX },
-      didDrawPage: (data:any) => {
-        // footer
-        const p = doc as any;
-        const str = `Page ${p.internal.getNumberOfPages()}`;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      didDrawPage: (_data: HookData) => {
+        const pageCount = doc.getNumberOfPages();
         doc.setFontSize(9);
-        doc.text(str, doc.internal.pageSize.getWidth() - marginX, doc.internal.pageSize.getHeight() - 20, { align: "right" });
+        doc.text(
+          `Page ${pageCount}`,
+          doc.internal.pageSize.getWidth() - marginX,
+          doc.internal.pageSize.getHeight() - 20,
+          { align: "right" }
+        );
       },
     });
 
-    // Totals box
+    const finalY = doc.lastAutoTable?.finalY ?? 75;
     doc.setFontSize(10);
     doc.text(
-      `Totals — Value: ${fmt(totals.value)} • Cost: ${fmt(totals.cost)} • P/L: ${(totals.pnl>=0?"+":"-")}${fmt(Math.abs(totals.pnl))}`,
-      marginX, doc.lastAutoTable.finalY + 20
+      `Totals — Value: ${money(totals.value)} • Cost: ${money(totals.cost)} • P/L: ${(totals.pnl >= 0 ? "+" : "-")}${money(Math.abs(totals.pnl))}`,
+      marginX, finalY + 20
     );
 
-    const fn = `Portfolio_${currentSet.id}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const fn = `Portfolio_${currentSet.id}_${new Date().toISOString().slice(0, 10)}.pdf`;
     doc.save(fn);
   }
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto">

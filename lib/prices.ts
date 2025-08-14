@@ -9,29 +9,28 @@ export type PriceObj = {
   src?: string;
 };
 
-const good = (n: any) => {
-  const x = Number(n);
+const isPosNum = (val: unknown): val is number => {
+  const x = Number(val);
   return Number.isFinite(x) && x > 0;
 };
 
 export function mergePrices(oldP?: PriceObj | null, incoming?: PriceObj | null): PriceObj | null {
   if (!oldP && !incoming) return null;
   const out: PriceObj = {
-    open:      good(incoming?.open)      ? Number(incoming!.open)      : good(oldP?.open)      ? Number(oldP!.open)      : null,
-    close:     good(incoming?.close)     ? Number(incoming!.close)     : good(oldP?.close)     ? Number(oldP!.close)     : null,
-    prevClose: good(incoming?.prevClose) ? Number(incoming!.prevClose) : good(oldP?.prevClose) ? Number(oldP!.prevClose) : null,
+    open:      isPosNum(incoming?.open)      ? incoming!.open      : isPosNum(oldP?.open)      ? oldP!.open      : null,
+    close:     isPosNum(incoming?.close)     ? incoming!.close     : isPosNum(oldP?.close)     ? oldP!.close     : null,
+    prevClose: isPosNum(incoming?.prevClose) ? incoming!.prevClose : isPosNum(oldP?.prevClose) ? oldP!.prevClose : null,
     ts: Math.max(oldP?.ts ?? 0, incoming?.ts ?? 0),
     src: incoming?.src ?? oldP?.src,
   };
-  if (!good(out.open) && !good(out.close) && !good(out.prevClose)) {
+  if (!isPosNum(out.open) && !isPosNum(out.close) && !isPosNum(out.prevClose)) {
     return oldP ?? incoming ?? null;
   }
   return out;
-}
+};
 
-const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
-// -------- sources (no API key) --------
 async function fetchFromStooq(symbol: string): Promise<PriceObj | null> {
   try {
     const stooqSym = `${symbol.toLowerCase()}.us`;
@@ -47,9 +46,9 @@ async function fetchFromStooq(symbol: string): Promise<PriceObj | null> {
     const close = Number(last?.[4]);
     const prevClose = Number(prev?.[4]);
     return {
-      open: good(open) ? open : null,
-      close: good(close) ? close : null,
-      prevClose: good(prevClose) ? prevClose : null,
+      open: isPosNum(open) ? open : null,
+      close: isPosNum(close) ? close : null,
+      prevClose: isPosNum(prevClose) ? prevClose : null,
       ts: Date.now(),
       src: "stooq",
     };
@@ -70,9 +69,9 @@ async function fetchFromYahoo(symbol: string): Promise<PriceObj | null> {
     const priceNow = Number(q.regularMarketPrice);
     const prevClose = Number(q.regularMarketPreviousClose);
     return {
-      open: good(open) ? open : null,
-      close: good(priceNow) ? priceNow : good(prevClose) ? prevClose : null,
-      prevClose: good(prevClose) ? prevClose : null,
+      open: isPosNum(open) ? open : null,
+      close: isPosNum(priceNow) ? priceNow : isPosNum(prevClose) ? prevClose : null,
+      prevClose: isPosNum(prevClose) ? prevClose : null,
       ts: Date.now(),
       src: "yahoo",
     };
@@ -81,21 +80,21 @@ async function fetchFromYahoo(symbol: string): Promise<PriceObj | null> {
   }
 }
 
-// -------- public helpers (namespaced by set) --------
+// ---- namespaced helpers by set ----
 const keyFor = (setId: string, symbol: string) => `price:${setId}:${symbol.toUpperCase()}`;
 
 export async function ensurePrice(symbol: string, setId: string): Promise<PriceObj | null> {
   const key = keyFor(setId, symbol);
   const cached = await kv.get<PriceObj>(key);
 
-  if (cached && (good(cached.open) || good(cached.close) || good(cached.prevClose))) {
+  if (cached && (isPosNum(cached.open) || isPosNum(cached.close) || isPosNum(cached.prevClose))) {
     return cached;
   }
 
   const s = await fetchFromStooq(symbol);
   const m1 = mergePrices(cached, s);
   if (m1) await kv.set(key, m1);
-  if (m1 && (good(m1.open) || good(m1.close) || good(m1.prevClose))) return m1;
+  if (m1 && (isPosNum(m1.open) || isPosNum(m1.close) || isPosNum(m1.prevClose))) return m1;
 
   const y = await fetchFromYahoo(symbol);
   const m2 = mergePrices(m1 ?? cached, y);
