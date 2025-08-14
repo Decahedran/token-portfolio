@@ -9,18 +9,18 @@ import { NextResponse } from "next/server";
 function nowInET(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
 }
-function minutesSinceMidnightET(d = nowInET()): number {
+function minutesET(d = nowInET()): number {
   return d.getHours() * 60 + d.getMinutes();
 }
-// Only run within +/- `tol` minutes of the target (in ET)
-function inWindowET(targetHour: number, targetMinute: number, tol = 5): boolean {
-  const m = minutesSinceMidnightET();
-  const t = targetHour * 60 + targetMinute;
-  return Math.abs(m - t) <= tol;
-}
-function isWeekdayET(): boolean {
-  const d = nowInET().getDay(); // 0=Sun .. 6=Sat
-  return d >= 1 && d <= 5;
+function minutes(h: number, m: number) { return h * 60 + m; }
+function isWeekdayET(): boolean { const d = nowInET().getDay(); return d >= 1 && d <= 5; }
+
+// true if current ET time is in [start, end] inclusive
+function inWindowET(startH: number, startM: number, endH: number, endM: number): boolean {
+  const cur = minutesET();
+  const start = minutes(startH, startM);
+  const end = minutes(endH, endM);
+  return cur >= start && cur <= end;
 }
 
 export async function GET(req: Request) {
@@ -28,18 +28,19 @@ export async function GET(req: Request) {
   const setQ = (searchParams.get("set") || "set1").toLowerCase();
   const when = (searchParams.get("when") || "").toLowerCase(); // "", "open", "close"
 
-  // Optional guard: only proceed at the intended minute in ET
+  // Only proceed near the intended ET time if "when" is provided (cron calls)
   if (when) {
-    // 09:35 ET window for "open", 16:10 ET for "close"
-    const shouldRun =
+    const okTime =
       when === "open"
-        ? inWindowET(9, 35, 6) && isWeekdayET()
+        // 09:35–10:55 ET covers both EST (09:35) and EDT (10:35)
+        ? inWindowET(9, 35, 10, 55) && isWeekdayET()
+        // 16:10–17:30 ET covers both EST (16:10) and EDT (17:10)
         : when === "close"
-        ? inWindowET(16, 10, 6) && isWeekdayET()
+        ? inWindowET(16, 10, 17, 30) && isWeekdayET()
         : true;
 
-    if (!shouldRun) {
-      return NextResponse.json({ ok: true, skipped: true, when, reason: "outside target window (ET)" });
+    if (!okTime) {
+      return NextResponse.json({ ok: true, skipped: true, when, reason: "outside ET window" });
     }
   }
 
