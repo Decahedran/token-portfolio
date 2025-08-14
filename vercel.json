@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/refresh", "schedule": "35 9 * * 1-5", "timezone": "America/New_York" },
+    { "path": "/api/refresh", "schedule": "10 16 * * 1-5", "timezone": "America/New_York" }
+  ]
+}
