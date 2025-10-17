@@ -26,7 +26,7 @@ export const PORTFOLIO_SETS: PortfolioSet[] = [
       { symbol: "META",  shares: 8,  purchasePrice: 75,  cards: 312 },
       { symbol: "TSLA",  shares: 6,  purchasePrice: 220, cards: 583 },
       { symbol: "AVGO",  shares: 3,  purchasePrice: 33,  cards: 583 },
-      { symbol: "JPM",   shares: 20, purchasePrice: 33,  cards: 583 },
+      { symbol: "JPM",   shares: 0.0083741, purchasePrice: 298.54,  cards: 125 },
       { symbol: "JNJ",   shares: 18, purchasePrice: 33,  cards: 583 },
       { symbol: "V",     shares: 10, purchasePrice: 33,  cards: 583 },
       { symbol: "MA",    shares: 7,  purchasePrice: 33,  cards: 583 },
